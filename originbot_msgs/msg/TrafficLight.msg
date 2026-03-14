@@ -1,15 +1,10 @@
-# TrafficLight.msg
+std_msgs/Header header
 
-# Define traffic light states
+uint8 state
+uint8 UNKNOWN=0
+uint8 STOP=1
+uint8 STRAIGHT=2
+uint8 LEFT=3
+uint8 RIGHT=4
 
-# Directions
-uint8 left = 0
-uint8 middle = 1
-uint8 right = 2
-
-# States
-uint8 stop = 3
-uint8 unknown = 4
-
-# Confidence
 float32 confidence
