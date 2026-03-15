@@ -35,7 +35,7 @@ def generate_launch_description():
             'usb_camera_calibration_file_path',
             default_value=TextSubstitution(text=str(config_file_path)),
             description='camera calibration file path'),
-        # Æô¶¯Áã¿½±´»·¾³ÅäÖÃnode
+        # ï¿½ï¿½ï¿½ï¿½ï¿½ã¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½node
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
                 os.path.join(
@@ -52,11 +52,34 @@ def generate_launch_description():
                     'usb_camera_calibration_file_path')},
                 {"image_height": 480},
                 {"image_width": 640},
-                {"io_method":'mmap'},
+                {"io_method": 'mmap'},
                 {"pixel_format": 'mjpeg'},
                 {"video_device": '/dev/video8'},
-                {"zero_copy":True}
+                {"zero_copy": True},
+                {"hbmem_pub_topic": '/hbmem_img'}
             ],
             arguments=['--ros-args', '--log-level', 'warn']
-        )
+        ),
+
+        Node(
+            package='hobot_codec',
+            executable='hobot_codec_republish',
+            output='screen',
+            parameters=[
+                {"channel": 1},
+                {"in_mode": "shared_mem"},
+                {"in_format": "jpeg"},
+                {"out_mode": "ros"},
+                {"out_format": "bgr8"},
+                {"sub_topic": "/hbmem_img"},
+                {"pub_topic": "/image_raw"}
+            ],
+            arguments=['--ros-args', '--log-level', 'warn']
+        ),
+
+        Node(
+            package='originbot_demo',
+            executable='transport_img',
+            arguments=['--ros-args', '--log-level', 'warn']
+        ),
     ])
