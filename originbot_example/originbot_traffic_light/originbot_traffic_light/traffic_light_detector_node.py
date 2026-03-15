@@ -6,38 +6,11 @@ from originbot_msgs.msg import TrafficLight
 from rclpy.node import Node
 from sensor_msgs.msg import Image
 
-
-def _clamp_roi(x, y, w, h, img_w, img_h):
-    x = max(0, min(int(x), img_w - 1))
-    y = max(0, min(int(y), img_h - 1))
-    w = max(1, min(int(w), img_w - x))
-    h = max(1, min(int(h), img_h - y))
-    return x, y, w, h
-
-
-def _mask_ratio(mask):
-    return float(np.count_nonzero(mask)) / float(mask.size)
-
+from originbot_traffic_light._utils import clamp_roi as _clamp_roi
+from originbot_traffic_light._utils import mask_ratio as _mask_ratio
+from originbot_traffic_light._utils import order_corners as _order_corners
 
 _DEBUG_THUMB_MAX_DIM = 160
-
-
-def _order_corners(pts):
-    """Return the four corner points in (top-left, top-right, bottom-right, bottom-left) order.
-
-    Sorting strategy: split the four points into the two with smaller y (top pair)
-    and the two with larger y (bottom pair), then order each pair left-to-right.
-    This is robust to perspective skew and rotated cards.
-    """
-    pts = pts.reshape(4, 2).astype(np.float32)
-    # Sort by y coordinate; top two points have smaller y
-    sorted_by_y = pts[np.argsort(pts[:, 1])]
-    top = sorted_by_y[:2]
-    bottom = sorted_by_y[2:]
-    # Within each pair, sort left-to-right by x
-    tl, tr = top[np.argsort(top[:, 0])]
-    bl, br = bottom[np.argsort(bottom[:, 0])]
-    return np.array([tl, tr, br, bl], dtype=np.float32)
 
 
 class TrafficLightDetector(Node):
@@ -102,6 +75,12 @@ class TrafficLightDetector(Node):
         self.declare_parameter('card_aspect_ratio_max', 6.0)
         self.declare_parameter('band_margin_px', 5)
 
+        # Always publish a state message on every processed frame, even when
+        # detection fails or confidence is below threshold (state=UNKNOWN,
+        # confidence=0.0).  Set publish_unknown:=false to revert to the old
+        # behaviour of only publishing when a confident detection is made.
+        self.declare_parameter('publish_unknown', True)
+
         # Debug image output (card mode)
         self.declare_parameter('debug', False)
         self.declare_parameter('debug_topic', '/traffic_light/debug')
@@ -141,6 +120,7 @@ class TrafficLightDetector(Node):
         self.min_red = float(self.get_parameter('min_red_ratio').value)
 
         self.bridge = CvBridge()
+        self.publish_unknown = bool(self.get_parameter('publish_unknown').value)
 
         image_topic = self.get_parameter('image_topic').value
         output_topic = self.get_parameter('output_topic').value
@@ -319,6 +299,9 @@ class TrafficLightDetector(Node):
             self.get_logger().warning(f'cv_bridge conversion failed: {exc}')
             return
 
+        # Build output message; state defaults to UNKNOWN / confidence 0.0
+        # so downstream nodes always receive a heartbeat even when detection
+        # fails or confidence is below threshold.
         out = TrafficLight()
         out.header = msg.header
 
@@ -327,7 +310,10 @@ class TrafficLightDetector(Node):
         else:
             self._process_roi_mode(bgr, out)
 
-        self.pub.publish(out)
+        # Publish on every frame unless the user opted into the legacy
+        # "only publish on confident detection" behaviour via publish_unknown=false.
+        if self.publish_unknown or out.state != TrafficLight.UNKNOWN:
+            self.pub.publish(out)
 
     def _process_roi_mode(self, bgr, out):
         img_h, img_w = bgr.shape[:2]

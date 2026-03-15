@@ -61,3 +61,8 @@ traffic_light_detector:
     # Debug image output (card mode only)
     debug: false
     debug_topic: /traffic_light/debug
+
+    # Publish a state message on every processed frame even when detection fails
+    # (state=UNKNOWN, confidence=0.0).  Set to false to revert to the old
+    # behaviour of only publishing on confident detections.
+    publish_unknown: true
