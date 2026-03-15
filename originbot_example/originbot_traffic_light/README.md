@@ -69,7 +69,7 @@ To switch permanently, edit `config/params.yaml` and change `mode: roi` to
 
 | Parameter | Type | Default | Description |
 |---|---|---|---|
-| `image_topic` | string | `/bgr8_image` | Input image topic |
+| `image_topic` | string | `/image_raw` | Input image topic (override with `image_topic:=<topic>`) |
 | `output_topic` | string | `/traffic_light/state` | Output state topic |
 | `mode` | string | `roi` | Detection mode: `roi` or `card` |
 | `left_x/y/w/h` | int | (see yaml) | Left ROI (roi mode) |
@@ -100,7 +100,7 @@ To switch permanently, edit `config/params.yaml` and change `mode: roi` to
 
 | Topic | Type | Description |
 |---|---|---|
-| `/bgr8_image` | `sensor_msgs/Image` | Input camera frame (BGR8) |
+| `/image_raw` | `sensor_msgs/Image` | Input camera frame (default; OriginBot camera publishes here) |
 
 ## Manual verification
 

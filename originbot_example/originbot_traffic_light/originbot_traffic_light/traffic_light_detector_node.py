@@ -18,7 +18,7 @@ class TrafficLightDetector(Node):
         super().__init__('traffic_light_detector')
 
         # Topics
-        self.declare_parameter('image_topic', '/bgr8_image')
+        self.declare_parameter('image_topic', '/image_raw')
         self.declare_parameter('output_topic', '/traffic_light/state')
 
         # Detection mode: "roi" (default, existing behaviour) or "card" (new auto mode)

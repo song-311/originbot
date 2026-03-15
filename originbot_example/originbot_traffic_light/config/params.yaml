@@ -1,6 +1,8 @@
 traffic_light_detector:
   ros__parameters:
-    image_topic: /bgr8_image
+    # OriginBot camera publishes frames on /image_raw; override with the
+    # image_topic launch argument if your setup uses a different topic.
+    image_topic: /image_raw
     output_topic: /traffic_light/state
 
     # Detection mode: "roi" (default, fixed-ROI) or "card" (auto printed-card detection)
