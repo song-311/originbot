@@ -21,20 +21,20 @@ traffic_light_detector:
     # -----------------------------------------------------------------------
 
     # Absolute pixel ROIs (640×480 defaults; used when ratio params are 0)
-    left_x: 128
-    left_y: 154
-    left_w: 131
-    left_h: 109
+    left_x: 40
+    left_y: 120
+    left_w: 210
+    left_h: 260
 
-    mid_x: 259
-    mid_y: 154
-    mid_w: 131
-    mid_h: 109
+    mid_x: 250
+    mid_y: 150
+    mid_w: 150
+    mid_h: 230
 
-    right_x: 391
-    right_y: 154
-    right_w: 131
-    right_h: 109
+    right_x: 400
+    right_y: 120
+    right_w: 210
+    right_h: 260
 
     # Normalised ratio ROIs (0.0 = disabled; set w/h > 0 to activate).
     # Example for a 640×480 frame equivalent to the absolute values above:
