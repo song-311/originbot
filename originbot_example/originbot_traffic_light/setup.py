@@ -27,6 +27,8 @@ setup(
         'console_scripts': [
             'traffic_light_detector_node = '
             'originbot_traffic_light.traffic_light_detector_node:main',
+            'intersection_action_manager_node = '
+            'originbot_traffic_light.intersection_action_manager_node:main',
         ],
     },
 )

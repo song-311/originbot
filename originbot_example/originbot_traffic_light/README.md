@@ -3,6 +3,10 @@
 ROS 2 node that detects traffic-light state from a camera image and publishes an
 `originbot_msgs/TrafficLight` message on `/traffic_light/state`.
 
+This package also ships an **intersection action manager** that subscribes to the
+detection output and drives the robot through the intersection once a stable,
+high-confidence actionable signal (`LEFT / RIGHT / STRAIGHT`) is received.
+
 **Publish semantics:** a state message is emitted on *every* processed image
 frame.  When detection fails or confidence is below threshold the message carries
 `state = UNKNOWN` and `confidence = 0.0`, so downstream nodes and tools like
@@ -149,6 +153,7 @@ To switch permanently, edit `config/params.yaml` and change `mode: roi` to
 | Topic | Type | Description |
 |---|---|---|
 | `/traffic_light/state` | `originbot_msgs/TrafficLight` | Detected state + confidence (published every frame; `UNKNOWN` / `0.0` when no detection) |
+| `/detect/traffic_decision` | `originbot_msgs/TrafficDecision` | Same detection data republished as `TrafficDecision`; consumed by `intersection_action_manager` |
 | `/traffic_light/debug` | `sensor_msgs/Image` | Debug image (card mode, `debug:=true`) |
 
 ## Subscribed topics
@@ -174,4 +179,132 @@ Expected output when no traffic-light card is in frame:
 header: ...
 state: 0        # UNKNOWN
 confidence: 0.0
+```
+
+---
+
+## Intersection Action Manager
+
+`intersection_action_manager` is a companion node that closes the loop between
+detection and robot movement.  It subscribes to `/detect/traffic_decision`,
+applies a confidence threshold and an additional debounce filter, then issues a
+single `/control/moving/state` (`MovingParam`) command when the conditions are
+met.
+
+### Message types (originbot_msgs)
+
+| Message | Fields | Description |
+|---|---|---|
+| `TrafficDecision` | `header`, `uint8 state` (UNKNOWN/STOP/STRAIGHT/LEFT/RIGHT), `float32 confidence` | Traffic-light decision from the detector |
+| `MovingParam` | `header`, `uint8 moving_type` (UNKNOWN/STOP/FORWARD/LEFT/RIGHT), `float32 moving_value` | Movement command sent to the robot executor |
+
+### State machine
+
+```
+IDLE
+ │  first /detect/traffic_decision message
+ ▼
+APPROACH
+ │  (immediate pass-through — no distance sensor in this package)
+ ▼
+WAIT_PERMISSION
+ │  stable_frames consecutive frames: same LEFT/RIGHT/STRAIGHT, confidence ≥ conf_th
+ ▼
+EXECUTE_MANEUVER          (one MovingParam published here)
+ │  /control/moving/complete (Bool, data=True)  OR  execute_timeout exceeded
+ ▼
+DONE
+ │  done_reset_delay elapsed
+ ▼
+IDLE
+```
+
+**STOP / UNKNOWN behaviour:** the node stays in `WAIT_PERMISSION` without
+issuing any movement command.  `/control/max_vel` is held at `max_vel_approach`
+(slow) so the robot idles safely.
+
+**Timeout protection:** if `wait_timeout` elapses the stable-frame counter is
+reset and `/control/max_vel` is set to `0.0`.  If `execute_timeout` elapses the
+node transitions to `DONE` and logs an error.
+
+### Parameters
+
+| Parameter | Default | Description |
+|---|---|---|
+| `conf_th` | `0.6` | Minimum confidence; below this the detection is treated as UNKNOWN |
+| `stable_frames` | `3` | Consecutive same-state frames required before issuing movement |
+| `wait_timeout` | `30.0` | Seconds before resetting the frame counter in WAIT_PERMISSION |
+| `execute_timeout` | `10.0` | Seconds before forcibly exiting EXECUTE_MANEUVER |
+| `done_reset_delay` | `3.0` | Seconds in DONE before returning to IDLE |
+| `max_vel_approach` | `0.1` | `/control/max_vel` (m/s) during APPROACH / WAIT_PERMISSION |
+| `max_vel_execute` | `0.15` | `/control/max_vel` (m/s) during EXECUTE_MANEUVER |
+
+### Topics (intersection_action_manager)
+
+**Subscribed:**
+
+| Topic | Type | Description |
+|---|---|---|
+| `/detect/traffic_decision` | `originbot_msgs/TrafficDecision` | Traffic-light decision from the detector |
+| `/control/moving/complete` | `std_msgs/Bool` | Movement completion feedback from the executor |
+
+**Published:**
+
+| Topic | Type | Description |
+|---|---|---|
+| `/control/moving/state` | `originbot_msgs/MovingParam` | Movement command (one per EXECUTE_MANEUVER phase) |
+| `/control/max_vel` | `std_msgs/Float64` | Speed ceiling for the approach / wait / execute phases |
+
+### Quickstart with intersection pipeline
+
+```bash
+# Source workspace
+source /opt/ros/humble/setup.bash
+source ~/ws_originbot/install/setup.bash
+
+# Launch detector + action manager together
+ros2 launch originbot_traffic_light intersection_action.launch.py
+
+# Launch in card mode
+ros2 launch originbot_traffic_light intersection_action.launch.py mode:=card
+```
+
+### Minimum debugging steps
+
+```bash
+# 1. Confirm the detector publishes on both old and new topics
+ros2 topic hz /traffic_light/state
+ros2 topic hz /detect/traffic_decision
+
+# 2. Inspect the traffic decision stream
+ros2 topic echo /detect/traffic_decision
+
+# 3. Simulate a LEFT signal (stable_frames=3 consecutive frames)
+#    Replace the stamp if your middleware requires it.
+for i in 1 2 3; do
+  ros2 topic pub --once /detect/traffic_decision originbot_msgs/msg/TrafficDecision \
+    "{header: {stamp: {sec: 0, nanosec: 0}, frame_id: ''}, state: 3, confidence: 0.85}"
+  sleep 0.1
+done
+
+# 4. Verify intersection_action_manager published a movement command
+ros2 topic echo /control/moving/state --once
+
+# 5. Simulate maneuver completion
+ros2 topic pub --once /control/moving/complete std_msgs/msg/Bool "{data: true}"
+
+# 6. Confirm no further /control/moving/state messages after completion
+ros2 topic echo /control/moving/state
+```
+
+**Checking STOP / low-confidence behaviour:**
+
+```bash
+# STOP signal – manager must NOT publish a movement command
+ros2 topic pub --once /detect/traffic_decision originbot_msgs/msg/TrafficDecision \
+  "{header: {stamp: {sec: 0, nanosec: 0}, frame_id: ''}, state: 1, confidence: 0.9}"
+
+# Low-confidence signal – treated as UNKNOWN, no movement
+ros2 topic pub --once /detect/traffic_decision originbot_msgs/msg/TrafficDecision \
+  "{header: {stamp: {sec: 0, nanosec: 0}, frame_id: ''}, state: 2, confidence: 0.3}"
 ```

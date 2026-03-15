@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import rclpy
 from cv_bridge import CvBridge
+from originbot_msgs.msg import TrafficDecision
 from originbot_msgs.msg import TrafficLight
 from rclpy.node import Node
 from sensor_msgs.msg import Image
@@ -22,6 +23,7 @@ class TrafficLightDetector(Node):
         # Topics
         self.declare_parameter('image_topic', '/image_raw')
         self.declare_parameter('output_topic', '/traffic_light/state')
+        self.declare_parameter('decision_topic', '/detect/traffic_decision')
 
         # Detection mode: "roi" (default, existing behaviour) or "card" (new auto mode)
         self.declare_parameter('mode', 'roi')
@@ -155,10 +157,13 @@ class TrafficLightDetector(Node):
 
         image_topic = self.get_parameter('image_topic').value
         output_topic = self.get_parameter('output_topic').value
+        decision_topic = self.get_parameter('decision_topic').value
         self.mode = self.get_parameter('mode').value
 
         self.sub = self.create_subscription(Image, image_topic, self._on_image, 10)
         self.pub = self.create_publisher(TrafficLight, output_topic, 10)
+        # Also publish as TrafficDecision for the intersection action manager
+        self.decision_pub = self.create_publisher(TrafficDecision, decision_topic, 10)
 
         # Optional debug publisher (card mode only)
         self.debug_pub = None
@@ -170,6 +175,7 @@ class TrafficLightDetector(Node):
         self.get_logger().info(f'Mode: {self.mode}')
         self.get_logger().info(f'Subscribing to: {image_topic}')
         self.get_logger().info(f'Publishing to:  {output_topic}')
+        self.get_logger().info(f'Publishing to:  {decision_topic}  (TrafficDecision)')
 
     # ------------------------------------------------------------------
     # ROI mode helpers
@@ -367,6 +373,12 @@ class TrafficLightDetector(Node):
         # "only publish on confident detection" behaviour via publish_unknown=false.
         if self.publish_unknown or out.state != TrafficLight.UNKNOWN:
             self.pub.publish(out)
+            # Mirror output as TrafficDecision for the intersection action manager
+            decision = TrafficDecision()
+            decision.header = out.header
+            decision.state = out.state
+            decision.confidence = out.confidence
+            self.decision_pub.publish(decision)
 
     def _process_roi_mode(self, bgr, out):
         img_h, img_w = bgr.shape[:2]

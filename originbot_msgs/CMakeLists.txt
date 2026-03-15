@@ -21,7 +21,9 @@ find_package(rosidl_default_generators REQUIRED)
 find_package(std_msgs REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
+  "msg/MovingParam.msg"
   "msg/OriginbotStatus.msg"
+  "msg/TrafficDecision.msg"
   "msg/TrafficLight.msg"
   "srv/OriginbotBuzzer.srv"
   "srv/OriginbotLed.srv"
