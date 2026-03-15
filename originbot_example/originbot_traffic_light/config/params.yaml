@@ -3,7 +3,10 @@ traffic_light_detector:
     image_topic: /bgr8_image
     output_topic: /traffic_light/state
 
-    # ROIs on 640x480 image
+    # Detection mode: "roi" (default, fixed-ROI) or "card" (auto printed-card detection)
+    mode: roi
+
+    # ROIs on 640x480 image (used in roi mode only)
     left_x: 128
     left_y: 154
     left_w: 131
@@ -46,3 +49,15 @@ traffic_light_detector:
     # Ratio thresholds
     min_green_ratio: 0.01
     min_red_ratio: 0.01
+
+    # Card mode parameters (used when mode: card)
+    card_warp_width: 320
+    card_warp_height: 120
+    min_card_area: 5000
+    card_aspect_ratio_min: 1.5  # typical card is ~3:1; allow 1.5–6.0 for perspective distortion
+    card_aspect_ratio_max: 6.0
+    band_margin_px: 5
+
+    # Debug image output (card mode only)
+    debug: false
+    debug_topic: /traffic_light/debug
