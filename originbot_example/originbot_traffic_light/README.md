@@ -3,6 +3,11 @@
 ROS 2 node that detects traffic-light state from a camera image and publishes an
 `originbot_msgs/TrafficLight` message on `/traffic_light/state`.
 
+**Publish semantics:** a state message is emitted on *every* processed image
+frame.  When detection fails or confidence is below threshold the message carries
+`state = UNKNOWN` and `confidence = 0.0`, so downstream nodes and tools like
+`ros2 topic echo` / `ros2 topic hz` never hang waiting for a first message.
+
 ## Detection modes
 
 The node supports two independent detection modes, selected by the `mode` parameter.
@@ -82,12 +87,13 @@ To switch permanently, edit `config/params.yaml` and change `mode: roi` to
 | `band_margin_px` | int | `5` | Horizontal margin inside each band (card mode) |
 | `debug` | bool | `false` | Publish annotated debug image (card mode) |
 | `debug_topic` | string | `/traffic_light/debug` | Debug image topic |
+| `publish_unknown` | bool | `true` | Publish `UNKNOWN` state when no confident detection; set `false` to revert to legacy publish-on-detection-only behaviour |
 
 ## Published topics
 
 | Topic | Type | Description |
 |---|---|---|
-| `/traffic_light/state` | `originbot_msgs/TrafficLight` | Detected state + confidence |
+| `/traffic_light/state` | `originbot_msgs/TrafficLight` | Detected state + confidence (published every frame; `UNKNOWN` / `0.0` when no detection) |
 | `/traffic_light/debug` | `sensor_msgs/Image` | Debug image (card mode, `debug:=true`) |
 
 ## Subscribed topics
@@ -95,3 +101,22 @@ To switch permanently, edit `config/params.yaml` and change `mode: roi` to
 | Topic | Type | Description |
 |---|---|---|
 | `/bgr8_image` | `sensor_msgs/Image` | Input camera frame (BGR8) |
+
+## Manual verification
+
+After starting the robot with camera enabled and launching the detector:
+
+```bash
+# Confirm messages arrive at a non-zero rate
+ros2 topic hz /traffic_light/state
+
+# Inspect messages – should show UNKNOWN when no card/sign is visible
+ros2 topic echo /traffic_light/state --qos-reliability best_effort
+```
+
+Expected output when no traffic-light card is in frame:
+```
+header: ...
+state: 0        # UNKNOWN
+confidence: 0.0
+```

@@ -1,0 +1,7 @@
+Metadata-Version: 2.1
+Name: originbot-traffic-light
+Version: 0.0.1
+Summary: ROI-based traffic light/sign board detection for OriginBot
+Maintainer: GuYueHome
+Maintainer-email: support@ps-micro.com
+License: Apache 2.0
