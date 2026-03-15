@@ -99,16 +99,17 @@ single-frame glitches from changing the published state.
 source /opt/ros/foxy/setup.bash
 source ~/ws_originbot/install/setup.bash
 
-# Run with default roi mode
+# Run with default roi mode (image_topic defaults to /image_raw)
 ros2 launch originbot_traffic_light traffic_light_detector.launch.py
 
-# Run in card mode (override a single parameter)
-ros2 launch originbot_traffic_light traffic_light_detector.launch.py \
-  --ros-args -p mode:=card
+# Run in card mode (override via launch argument)
+ros2 launch originbot_traffic_light traffic_light_detector.launch.py mode:=card
 
 # Enable debug images in card mode
-ros2 launch originbot_traffic_light traffic_light_detector.launch.py \
-  --ros-args -p mode:=card -p debug:=true
+ros2 launch originbot_traffic_light traffic_light_detector.launch.py mode:=card debug:=true
+
+# Override the image topic (e.g. when your camera publishes on a different topic)
+ros2 launch originbot_traffic_light traffic_light_detector.launch.py image_topic:=/image_raw
 ```
 
 To switch permanently, edit `config/params.yaml` and change `mode: roi` to
