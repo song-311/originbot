@@ -6,9 +6,11 @@ from originbot_msgs.msg import TrafficLight
 from rclpy.node import Node
 from sensor_msgs.msg import Image
 
+from originbot_traffic_light._utils import DebounceFilter as _DebounceFilter
 from originbot_traffic_light._utils import clamp_roi as _clamp_roi
 from originbot_traffic_light._utils import mask_ratio as _mask_ratio
 from originbot_traffic_light._utils import order_corners as _order_corners
+from originbot_traffic_light._utils import ratio_to_roi as _ratio_to_roi
 
 _DEBUG_THUMB_MAX_DIM = 160
 
@@ -39,6 +41,18 @@ class TrafficLightDetector(Node):
         self.declare_parameter('right_y', 154)
         self.declare_parameter('right_w', 131)
         self.declare_parameter('right_h', 109)
+
+        # Optional normalised ROI parameters (0.0–1.0) for each band.
+        # Precedence: if w_ratio and h_ratio are both > 0 the ratio set is
+        # "active"; it is then validated (x/y in [0,1], w/h in (0,1]) and,
+        # when valid, used to derive the absolute ROI from the current frame
+        # size.  If the set is inactive (default 0.0) or invalid, the node
+        # falls back to the absolute pixel parameters above.
+        for _prefix in ('left', 'mid', 'right'):
+            self.declare_parameter(f'{_prefix}_x_ratio', 0.0)
+            self.declare_parameter(f'{_prefix}_y_ratio', 0.0)
+            self.declare_parameter(f'{_prefix}_w_ratio', 0.0)
+            self.declare_parameter(f'{_prefix}_h_ratio', 0.0)
 
         # HSV thresholds – green
         self.declare_parameter('green_h_low', 35)
@@ -81,6 +95,11 @@ class TrafficLightDetector(Node):
         # behaviour of only publishing when a confident detection is made.
         self.declare_parameter('publish_unknown', True)
 
+        # Temporal debounce – require N consecutive frames before committing to
+        # a new state to suppress spurious single-frame detections.
+        self.declare_parameter('debounce_frames', 3)
+        self.declare_parameter('debounce_unknown', True)
+
         # Debug image output (card mode)
         self.declare_parameter('debug', False)
         self.declare_parameter('debug_topic', '/traffic_light/debug')
@@ -122,6 +141,18 @@ class TrafficLightDetector(Node):
         self.bridge = CvBridge()
         self.publish_unknown = bool(self.get_parameter('publish_unknown').value)
 
+        # Initialise debounce filter
+        debounce_frames = int(self.get_parameter('debounce_frames').value)
+        debounce_unknown = bool(self.get_parameter('debounce_unknown').value)
+        self._debounce = _DebounceFilter(
+            debounce_frames=debounce_frames,
+            debounce_unknown=debounce_unknown,
+            unknown_state=TrafficLight.UNKNOWN,
+        )
+
+        # Track per-band ratio-warning state (warn once per invalid set)
+        self._ratio_warned = set()
+
         image_topic = self.get_parameter('image_topic').value
         output_topic = self.get_parameter('output_topic').value
         self.mode = self.get_parameter('mode').value
@@ -145,6 +176,25 @@ class TrafficLightDetector(Node):
     # ------------------------------------------------------------------
 
     def _roi_params(self, prefix, img_w, img_h):
+        xr = float(self.get_parameter(f'{prefix}_x_ratio').value)
+        yr = float(self.get_parameter(f'{prefix}_y_ratio').value)
+        wr = float(self.get_parameter(f'{prefix}_w_ratio').value)
+        hr = float(self.get_parameter(f'{prefix}_h_ratio').value)
+
+        # Ratio set is "active" when w/h ratios are positive
+        if wr > 0.0 or hr > 0.0:
+            result = _ratio_to_roi(xr, yr, wr, hr, img_w, img_h)
+            if result is not None:
+                return result
+            # Active but invalid – warn once and fall through to absolute ROI
+            if prefix not in self._ratio_warned:
+                self._ratio_warned.add(prefix)
+                self.get_logger().warning(
+                    f'ROI ratio params for "{prefix}" are out of range '
+                    f'(x/y must be in [0,1], w/h in (0,1]); '
+                    f'falling back to absolute pixel ROI'
+                )
+
         x = self.get_parameter(f'{prefix}_x').value
         y = self.get_parameter(f'{prefix}_y').value
         w = self.get_parameter(f'{prefix}_w').value
@@ -309,6 +359,9 @@ class TrafficLightDetector(Node):
             self._process_card_mode(bgr, msg.header, out)
         else:
             self._process_roi_mode(bgr, out)
+
+        # Apply temporal debounce: stabilise state across consecutive frames
+        out.state, out.confidence = self._debounce.update(out.state, out.confidence)
 
         # Publish on every frame unless the user opted into the legacy
         # "only publish on confident detection" behaviour via publish_unknown=false.

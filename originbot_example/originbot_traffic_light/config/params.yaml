@@ -6,7 +6,19 @@ traffic_light_detector:
     # Detection mode: "roi" (default, fixed-ROI) or "card" (auto printed-card detection)
     mode: roi
 
-    # ROIs on 640x480 image (used in roi mode only)
+    # -----------------------------------------------------------------------
+    # ROI parameters (used in roi mode only)
+    #
+    # Precedence: if *_w_ratio and *_h_ratio are both > 0 for a band, the
+    # ratio set is considered "active" and the node derives absolute pixel
+    # coordinates from the current frame dimensions.  x/y ratios must be in
+    # [0, 1] and w/h ratios in (0, 1].  Any out-of-range value triggers a
+    # one-time warning and falls back to the absolute pixel parameters below.
+    # When all ratio params are 0.0 (the default) the absolute pixel ROIs are
+    # used directly – existing configs continue to work unchanged.
+    # -----------------------------------------------------------------------
+
+    # Absolute pixel ROIs (640×480 defaults; used when ratio params are 0)
     left_x: 128
     left_y: 154
     left_w: 131
@@ -21,6 +33,24 @@ traffic_light_detector:
     right_y: 154
     right_w: 131
     right_h: 109
+
+    # Normalised ratio ROIs (0.0 = disabled; set w/h > 0 to activate).
+    # Example for a 640×480 frame equivalent to the absolute values above:
+    #   left_x_ratio: 0.200   left_y_ratio: 0.321   left_w_ratio: 0.205   left_h_ratio: 0.227
+    left_x_ratio: 0.0
+    left_y_ratio: 0.0
+    left_w_ratio: 0.0
+    left_h_ratio: 0.0
+
+    mid_x_ratio: 0.0
+    mid_y_ratio: 0.0
+    mid_w_ratio: 0.0
+    mid_h_ratio: 0.0
+
+    right_x_ratio: 0.0
+    right_y_ratio: 0.0
+    right_w_ratio: 0.0
+    right_h_ratio: 0.0
 
     # HSV thresholds – green
     green_h_low: 35
@@ -66,3 +96,18 @@ traffic_light_detector:
     # (state=UNKNOWN, confidence=0.0).  Set to false to revert to the old
     # behaviour of only publishing on confident detections.
     publish_unknown: true
+
+    # -----------------------------------------------------------------------
+    # Temporal debounce
+    #
+    # debounce_frames: number of consecutive frames a candidate state must be
+    #   observed before the published stable state is updated.  Setting this
+    #   to 1 disables debounce (every frame's detection is published immediately).
+    #   Increase to 3–5 frames to suppress spurious single-frame flips.
+    # debounce_unknown: when true (default) the UNKNOWN state also requires a
+    #   streak before taking effect.  Set to false to allow the detector to
+    #   drop back to UNKNOWN immediately (useful if you rely on UNKNOWN as a
+    #   "lost sight of sign" signal).
+    # -----------------------------------------------------------------------
+    debounce_frames: 3
+    debounce_unknown: true
