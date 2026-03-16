@@ -272,6 +272,7 @@ class IntersectionActionManager(Node):
 
         elif self._state == _State.EXECUTE_MANEUVER and self._execute_start is not None:
             # NEW: angle-dominant termination for LEFT/RIGHT
+            # STRAIGHT relies on the fallback timeout below
             if self._turn_direction in (TrafficDecision.LEFT, TrafficDecision.RIGHT):
                 if self._current_yaw is not None and self._turn_start_yaw is not None:
                     delta = _normalize_angle(self._current_yaw - self._turn_start_yaw)
@@ -284,7 +285,7 @@ class IntersectionActionManager(Node):
                             and self._line_true_count >= self._line_reacquire_true_frames
                         ):
                             self.get_logger().info(
-                                f'Turn დასრულ: line reacquired after {turned_deg:.1f} deg'
+                                f'Turn completed: line reacquired after {turned_deg:.1f} deg'
                             )
                             self._transition(_State.DONE)
                             return
@@ -331,6 +332,7 @@ class IntersectionActionManager(Node):
 
         elif new_state == _State.DONE:
             self._done_time = now
+            self._publish_max_vel(0.0)
 
         elif new_state == _State.IDLE:
             self._decision_buffer.clear()
