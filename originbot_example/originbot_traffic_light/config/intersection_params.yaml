@@ -1,32 +1,23 @@
 intersection_action_manager:
   ros__parameters:
-    # Minimum confidence for a detection to be treated as valid.
-    # Below this threshold the state is treated as UNKNOWN (conservative).
     conf_th: 0.6
-
-    # Number of consecutive frames the same actionable state must be seen
-    # (after confidence filtering) before a movement command is issued.
-    # Provides an additional debounce layer on top of the detector's own
-    # temporal filter.
     stable_frames: 3
-
-    # Seconds to wait in WAIT_PERMISSION before emitting a timeout warning
-    # and resetting the stable-frame counter.  The node holds position
-    # conservatively (max_vel → 0) and keeps watching for a valid signal.
     wait_timeout: 30.0
-
-    # Seconds before EXECUTE_MANEUVER is forcibly exited with an error log
-    # to prevent the robot from getting stuck.
     execute_timeout: 10.0
-
-    # Seconds in DONE state before auto-resetting to IDLE for the next
-    # intersection.
     done_reset_delay: 3.0
-
-    # Maximum velocity (m/s) published to /control/max_vel during APPROACH
-    # and WAIT_PERMISSION phases.
     max_vel_approach: 0.1
-
-    # Maximum velocity (m/s) published to /control/max_vel during the
-    # EXECUTE_MANEUVER phase.
     max_vel_execute: 0.15
+
+    # turn control (angle-dominant)
+    turn_target_angle_deg: 90.0
+    turn_max_angle_deg: 105.0
+    turn_min_angle_deg_for_line_exit: 55.0
+    right_turn_negative: true
+
+    # line reacquire (optional early exit)
+    turn_use_line_reacquire: true
+    line_reacquire_topic: /line_follow/line_found
+    line_reacquire_true_frames: 2
+
+    # yaw source
+    odom_topic: /odom
