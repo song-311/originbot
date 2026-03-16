@@ -308,3 +308,48 @@ ros2 topic pub --once /detect/traffic_decision originbot_msgs/msg/TrafficDecisio
 ros2 topic pub --once /detect/traffic_decision originbot_msgs/msg/TrafficDecision \
   "{header: {stamp: {sec: 0, nanosec: 0}, frame_id: ''}, state: 2, confidence: 0.3}"
 ```
+
+## Intersection Action Manager（更新行为说明）
+
+本节点根据 `/detect/traffic_decision` 执行十字路口动作，当前策略：
+
+- `STOP(1)`：发布一次 `MOVING_STOP`，并将 `/control/max_vel` 置为 `0.0`（保持停车）
+- `LEFT(3)` / `RIGHT(4)`：进入转向执行，退出条件采用 **角度限制为主**：
+  1. （可选）达到最小转角后，重新识别到引导线，提前结束转向；
+  2. 达到最大转角上限，强制结束；
+  3. 超时仅作兜底，避免死锁。
+
+### 新增参数（intersection_params.yaml）
+
+- `turn_target_angle_deg`：目标转角（默认 90）
+- `turn_max_angle_deg`：转角硬上限（默认 105）
+- `turn_min_angle_deg_for_line_exit`：允许“识别到线即退出”的最小转角（默认 55）
+- `right_turn_negative`：右转角符号配置
+- `turn_use_line_reacquire`：是否启用线重捕获提前退出
+- `line_reacquire_topic`：线重捕获信号 topic（`std_msgs/Bool`）
+- `line_reacquire_true_frames`：连续为 true 的帧数阈值
+- `odom_topic`：里程计 topic（用于 yaw 角估计）
+
+### 调试建议
+
+1. 先验证 STOP：
+```bash
+ros2 topic pub --once /detect/traffic_decision originbot_msgs/msg/TrafficDecision \
+"{header: {stamp: {sec: 0, nanosec: 0}, frame_id: ''}, state: 1, confidence: 0.9}"
+```
+
+2. 验证 LEFT：
+```bash
+for i in 1 2 3; do
+  ros2 topic pub --once /detect/traffic_decision originbot_msgs/msg/TrafficDecision \
+  "{header: {stamp: {sec: 0, nanosec: 0}, frame_id: ''}, state: 3, confidence: 0.9}"
+done
+```
+
+3. 验证 RIGHT：
+```bash
+for i in 1 2 3; do
+  ros2 topic pub --once /detect/traffic_decision originbot_msgs/msg/TrafficDecision \
+  "{header: {stamp: {sec: 0, nanosec: 0}, frame_id: ''}, state: 4, confidence: 0.9}"
+done
+```
