@@ -1,6 +1,5 @@
 import os
 from glob import glob
-
 from setuptools import setup
 
 package_name = 'originbot_traffic_light'
@@ -25,10 +24,11 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'traffic_light_detector_node = '
-            'originbot_traffic_light.traffic_light_detector_node:main',
-            'intersection_action_manager_node = '
-            'originbot_traffic_light.intersection_action_manager_node:main',
+            'traffic_light_detector_node = originbot_traffic_light.traffic_light_detector_node:main',
+            'intersection_action_manager_node = originbot_traffic_light.intersection_action_manager_node:main',
+            'moving_adapter_node = originbot_traffic_light.moving_adapter_node:main',
+            # [新增] 把我们新写的巡线节点注册进来
+            'line_follower_node = originbot_traffic_light.line_follower_node:main', 
         ],
     },
 )
